@@ -1,21 +1,22 @@
-let books = [
+let books = JSON.parse(localStorage.getItem('books')) || [
     { id: 1, title: "The Great Gatsby", author: "F. Scott Fitzgerald", isbn: "9780743273565", genre: "Classic", quantity: 5, available: 5, cover: "https://placehold.co/150x220/007bff/white?text=Gatsby", publishedDate: "1925-04-10" },
     { id: 2, title: "To Kill a Mockingbird", author: "Harper Lee", isbn: "9780061120084", genre: "Fiction", quantity: 3, available: 3, cover: "https://placehold.co/150x220/28a745/white?text=Mockingbird", publishedDate: "1960-07-11" },
     { id: 3, title: "1984", author: "George Orwell", isbn: "9780451524935", genre: "Dystopian", quantity: 7, available: 7, cover: "https://placehold.co/150x220/ffc107/black?text=1984", publishedDate: "1949-06-08" },
     { id: 4, title: "Pride and Prejudice", author: "Jane Austen", isbn: "9780141439518", genre: "Romance", quantity: 4, available: 4, cover: "https://placehold.co/150x220/dc3545/white?text=Pride+Prejudice", publishedDate: "1813-01-28" },
-    { id: 5, title: "The Hobbit", author: "J.R.R. Tolkien", isbn: "9780547928227", genre: "Fantasy", quantity: 6, available: 6, cover: "https://placehold.co/150x220/17a2b8/white?text=Hobbit", publishedDate: "1937-09-21" },
+    { id: 5, title: "The Hobbit", author: "J.R.R. Tolkien", isbn: "9780547928227", genre: "Fantasy", quantity: 6, available: 6, cover: "https://placehold.co/150x220/17a2b8/white?text=Hobbit", publishedDate: "1937-09-21" }
 ];
 
-let students = [
+let students = JSON.parse(localStorage.getItem('students')) || [
     { id: 101, name: "Alice Smith", email: "alice@example.com", grade: "10A", borrowedBooksCount: 0 },
     { id: 102, name: "Bob Johnson", email: "bob@example.com", grade: "9B", borrowedBooksCount: 0 },
     { id: 103, name: "Charlie Brown", email: "charlie@example.com", grade: "11C", borrowedBooksCount: 0 },
     { id: 104, name: "Diana Prince", email: "diana@example.com", grade: "10A", borrowedBooksCount: 0 }
 ];
 
-let borrowedItems = [
-    // Example: { id: 1, bookId: 1, studentId: 101, borrowDate: "2025-05-01", dueDate: "2025-05-15", returned: false, returnDate: null }
-];
+// Also apply this if you're using issuedBooks[]
+let borrowedItems = JSON.parse(localStorage.getItem('borrowedItems')) || [];
+
+
 
 
 
@@ -198,18 +199,30 @@ function viewBookDetails(bookId) { /* Same as before */
     });
 }
 
-function deleteBook(bookId) { /* Same as before */
-    Swal.fire({ title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d', confirmButtonText: 'Yes, delete it!' })
-        .then((result) => {
-            if (result.isConfirmed) {
-                const isBorrowed = borrowedItems.some(item => item.bookId === bookId && !item.returned);
-                if (isBorrowed) { showMessage('Cannot Delete', 'This book is currently borrowed.', 'error'); return; }
-                books = books.filter(b => b.id !== bookId);
-                showMessage('Deleted!', 'The book has been deleted.', 'success');
-                renderBookCatalog();
+function deleteBook(bookId) {
+    Swal.fire({
+        title: 'Are you sure?',
+        text: "You won't be able to revert this!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const isBorrowed = borrowedItems.some(item => item.bookId === bookId && !item.returned);
+            if (isBorrowed) {
+                showMessage('Cannot Delete', 'This book is currently borrowed.', 'error');
+                return;
             }
-        });
+            books = books.filter(b => b.id !== bookId);
+            localStorage.setItem('books', JSON.stringify(books)); // ✅ persist deletion
+            showMessage('Deleted!', 'The book has been deleted.', 'success');
+            renderBookCatalog();
+        }
+    });
 }
+
 
 // Add New Book / Edit Book
 function renderAddNewBookForm(params = {}) { /* Mostly same, ensure flatpickr re-init */
@@ -281,6 +294,7 @@ function renderAddNewBookForm(params = {}) { /* Mostly same, ensure flatpickr re
             const newBook = { id: generateId(books), title, author, isbn, genre, quantity, available: quantity, cover, publishedDate };
             books.push(newBook);
             showMessage('Book Added!', `${title} added to the library.`, 'success');
+            localStorage.setItem('books', JSON.stringify(books)); // ✅ Save to localStorage
         }
         navigateTo('catalog');
     });
@@ -317,6 +331,7 @@ function renderBorrowBookForm(params = {}) { /* Mostly same, ensure flatpickr re
             book.available--;
             const borrowEntry = { id: generateId(borrowedItems), bookId: book.id, studentId: student.id, borrowDate: new Date().toISOString().split('T')[0], dueDate: returnDate, returned: false, returnDate: null };
             borrowedItems.push(borrowEntry);
+            localStorage.setItem('borrowedItems', JSON.stringify(borrowedItems));
             updateStudentBorrowedCounts(); // Update student's count
             showMessage('Book Borrowed!', `${book.title} issued to ${student.name}.`, 'success');
             navigateTo('issuedBooks');
@@ -358,6 +373,7 @@ function renderReturnBookPage() { /* Mostly same, ensure DataTables re-init */
                         const book = books.find(b => b.id === borrowedItem.bookId); if (book) { book.available++; }
                         updateStudentBorrowedCounts();
                         showMessage('Book Returned!', `Book marked as returned. ${lateFee > 0 ? 'Late fee processed.' : ''}`, 'success');
+                        localStorage.setItem('borrowedItems', JSON.stringify(borrowedItems)); // ✅ Save after return
                         renderReturnBookPage();
                     }
                 });
@@ -470,11 +486,14 @@ function renderAddEditStudentForm(params = {}) {
             if (studentIndex > -1) {
                 students[studentIndex] = { ...students[studentIndex], name, email, grade };
                 showMessage('Student Updated!', `${name}'s details updated.`, 'success');
+                localStorage.setItem('students', JSON.stringify(students)); // ✅ persist edit
             } else { showMessage('Error', 'Could not find student to update.', 'error'); }
         } else {
             const newStudent = { id: generateId(students), name, email, grade, borrowedBooksCount: 0 };
             students.push(newStudent);
             showMessage('Student Added!', `${name} has been registered.`, 'success');
+            localStorage.setItem('students', JSON.stringify(students)); // ✅ persist new student
+
         }
         navigateTo('manageStudents');
     });
@@ -495,6 +514,7 @@ function deleteStudent(studentId) {
                 // Optional: Remove student's past borrowing records from borrowedItems if desired (could be an archive step)
                 // borrowedItems = borrowedItems.filter(item => item.studentId !== studentId);
                 showMessage('Student Deleted!', `${student.name} has been removed.`, 'success');
+                localStorage.setItem('students', JSON.stringify(students)); // ✅ persist deletion
                 renderManageStudentsPage();
             }
         });
@@ -531,6 +551,7 @@ function renderIssuedBooks() { /* Mostly same, ensure DataTables re-init */
                         const book = books.find(b => b.id === borrowedItem.bookId); if (book) book.available++;
                         updateStudentBorrowedCounts();
                         showMessage('Book Returned!', 'Marked as returned.', 'success');
+                        localStorage.setItem('borrowedItems', JSON.stringify(borrowedItems)); // ✅ persist return
                         renderIssuedBooks();
                     }
                 });
@@ -575,6 +596,7 @@ function renderLateReturns() { /* Mostly same, ensure DataTables re-init */
                         const book = books.find(b => b.id === borrowedItem.bookId); if (book) book.available++;
                         updateStudentBorrowedCounts();
                         showMessage('Book Returned & Fine Processed!', `Fine of $${lateFee} processed.`, 'success');
+                        localStorage.setItem('borrowedItems', JSON.stringify(borrowedItems)); // ✅ persist return + fine
                         renderLateReturns();
                     }
                 });
