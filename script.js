@@ -562,7 +562,8 @@ function renderIssuedBooks() { /* Mostly same, ensure DataTables re-init */
 // Late Returns Management
 function renderLateReturns() { /* Mostly same, ensure DataTables re-init */
     const today = new Date().toISOString().split('T')[0];
-    let tableRows = borrowedItems.filter(item => !item.returned && item.dueDate < today).map(item => {
+    let tableRows = borrowedItems.filter(item => !item.returned && new Date(item.dueDate) < new Date()).map(item => {
+
         const book = books.find(b => b.id === item.bookId);
         const student = students.find(s => s.id === item.studentId);
         if (!book || !student) return '';
@@ -570,7 +571,8 @@ function renderLateReturns() { /* Mostly same, ensure DataTables re-init */
         const lateFee = (diffDays * 1.00).toFixed(2);
         return `<tr class="table-danger" data-aos="fade-up"><td>${book.title}</td><td>${student.name}</td><td>${formatDate(item.dueDate)}</td><td>${diffDays} days</td><td>$${lateFee}</td><td><button class="btn btn-sm btn-warning remind-student-btn" data-student-id="${student.id}" data-book-title="${book.title}"><i class="fas fa-bell"></i> Remind</button><button class="btn btn-sm btn-success mark-returned-late-btn ms-1" data-borrow-id="${item.id}" data-late-fee="${lateFee}"><i class="fas fa-check"></i> Return</button></td></tr>`;
     }).join('');
-    if (!borrowedItems.filter(item => !item.returned && item.dueDate < today).length) { tableRows = `No late returns at the moment.`; }
+    if (!borrowedItems.filter(item => !item.returned && new Date(item.dueDate) < new Date()).length)
+     { tableRows = `No late returns at the moment.`; }
     mainContent.innerHTML = `
                 <div class="content-section" data-aos="fade-up">
                     <h2><i class="fas fa-exclamation-triangle me-2"></i>Late Return Management</h2>
